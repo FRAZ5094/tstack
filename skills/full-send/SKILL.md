@@ -45,7 +45,8 @@ one appears.
 1. **Finish the change.** Complete the goal from the user's request with the
    smallest change that works. Fix the case that happened, not every case
    that could. If you are on the default branch, create a branch first.
-2. **Prove it.** Get proof for every change you made. See "Proof".
+2. **Prove it.** Get proof for every change you made, and record walkthroughs.
+   See "Proof" and "Walkthroughs".
 3. **Get feedback.** Use the `sol-loop` skill to verify changes.
 4. **File the PR** with the `file-pr` skill. Target the base branch the user
    named, or the default branch if they named none. Bring the branch up to
@@ -54,11 +55,16 @@ one appears.
    description that says how you proved the change.
 5. **Babysit the PR** with the `babysit-pr` skill. Fix real findings and CI
    failures. Get proof for each fix before you push it.
-6. **Merge** when the merge gate passes.
-7. **Report** in your final message: the PR link, the merge commit, your proof,
-   and each decision you made for the user.
+6. **Merge** when the merge gate passes. See "Releases" when the merge needs
+   a version choice.
+7. **Check the deploy.** If the target branch deploys automatically, confirm
+   the deploy finished and is healthy. Do not start OTA or store releases
+   unless the user asked, as "Releases" describes.
+8. **Report** in your final message: the PR link, the merge commit, your proof,
+   the walkthrough links, the change's risk and blast radius, and each
+   decision you made for the user.
 
-Stay active from step 1 to step 7. If you end your turn while checks or bots are
+Stay active from step 1 to step 8. If you end your turn while checks or bots are
 pending, the work stops, because nobody will prompt you again. Wait with the
 watcher from `babysit-pr`, so something wakes you when the PR changes. In T3
 Code that is `watch_pull_request`. If you stop before the merge, call
@@ -80,6 +86,29 @@ reproduction, a screenshot. Use the most direct proof the change allows:
 
 When you cannot find a way to prove a change, you do not have full confidence.
 Ask the user.
+
+## Walkthroughs
+
+Record walkthroughs when the change has something to see. They are for the
+user's review. Make before and after videos of each behavior or screen that
+changed, and a video of each new feature. Upload them with the repo's
+artifact tool when it has one. Link them in the PR description and the final
+report.
+
+Walkthroughs add to the proof and do not replace it. The testing permission
+covers the app runs and recordings they need. When nothing is visible, such
+as a backend only fix, say so in the report instead.
+
+## Releases
+
+When the user says "full send" and calls the change a patch, that confirms a
+patch release for every app the change touches. Follow the repo's release
+process without asking for the version. That includes an OTA update when the
+process says the change is OTA compatible.
+
+Ask instead when the change is bigger than a patch, needs a native build,
+needs production environment or database changes, or the right version is
+unclear. Without "patch", ask before any merge that needs a version choice.
 
 ## Merge gate
 

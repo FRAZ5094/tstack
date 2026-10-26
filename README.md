@@ -58,14 +58,18 @@ Changes from upstream:
   a pending check, a 👀 reaction, or a running `codex-review-state`.
 - `full-send` targets the base branch the user named, not only the default
   branch, and updates from it the way the repo does.
-- `sol-loop` also triggers on "local review".
+- `sol-loop` also triggers on "local review" and uses high reasoning effort.
+- `babysit-pr` also triggers on "fix the valid AI reviewer issues and resolve
+  the rest".
 - The main agent decides which review findings to fix. `sol-loop` does not
   hand disputes to the user, and `babysit-pr` resolves every bot thread it
   handles, fixed or declined. Unsure findings go in the report. `full-stop`
   lists declined and unsure findings for review. `full-send` asks only when
   it finds something seriously wrong.
-
-Personal preferences live in `~/.codex/AGENTS.md`, not in these skills.
+- `full-send` and `full-stop` record walkthrough videos and report the
+  change's risk and blast radius. `full-send` checks auto deploys after
+  merging and treats "full send" plus "patch" as permission for a patch
+  release.
 
 ## License
 

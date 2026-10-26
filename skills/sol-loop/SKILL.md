@@ -46,9 +46,10 @@ missing or pre-failing checks in the brief.
 ## 2. Start Sol
 
 In T3, call `orchestrator_capabilities`. Pick the latest Sol unless the user
-named a version. Do not hardcode an ID. Record provider, model, and effort
-only if exposed. Use `delegate_task` every round (`role: "review"`,
-`mode: "async"`). Save `taskId`. New `clientRequestId` per round.
+named a version. Use high reasoning effort unless the user named another. Do
+not hardcode an ID. Record provider, model, and effort only if exposed. Use
+`delegate_task` every round (`role: "review"`, `mode: "async"`). Save
+`taskId`. New `clientRequestId` per round.
 `childThreadId` is storage, not the next target. Do not use
 `t3_thread_send`, `create_threads`, or `t3_thread_launch` for review.
 
