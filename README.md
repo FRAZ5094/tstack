@@ -61,7 +61,9 @@ Changes from upstream:
 - `sol-loop` also triggers on "local review".
 - The main agent decides which review findings to fix. `sol-loop` does not
   hand disputes to the user, and `babysit-pr` resolves every bot thread it
-  handles, fixed or declined.
+  handles, fixed or declined. Unsure findings go in the report. `full-stop`
+  lists declined and unsure findings for review. `full-send` asks only when
+  it finds something seriously wrong.
 
 Personal preferences live in `~/.codex/AGENTS.md`, not in these skills.
 

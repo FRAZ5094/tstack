@@ -113,6 +113,9 @@ user. Resolve every review bot thread you handle:
 - **Declined:** reply with the reason in a line or two, then resolve the
   thread as is.
 
+When you are genuinely unsure about a finding, make your best call and note it
+for the final report. Do not stop to ask about it.
+
 Threads from the user follow the same rule. Reply to threads from other people,
 but leave them open for that person unless the user says otherwise. Use the
 `leaving-pr-comments` skill for every comment posted on the user's behalf.

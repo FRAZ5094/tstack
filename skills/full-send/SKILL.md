@@ -116,6 +116,9 @@ Ask only when you cannot continue alone:
   branch.
 - The goal is ambiguous in a way that changes the result.
 - Another PR makes this one obsolete.
+- You find something seriously wrong that should not ship, such as a security
+  hole, data loss, or a production breakage. Review findings you judged not
+  worth fixing are not a reason to ask.
 
 Decide everything else yourself with sensible defaults, and list those decisions
 in the report.

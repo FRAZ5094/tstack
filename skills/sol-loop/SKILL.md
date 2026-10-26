@@ -107,8 +107,9 @@ Mark each old id `resolved` or `still open: <reason>`.
 Agreed: APPROVE on the current behavior diff, no blocker or should open,
 no concern of your own. Stuck: an item stays disputed after two replies,
 or budget ends. Make the call yourself: fix it or decline it, and show both
-sides in 2-3 lines each in the report. Ask the user only when the choice
-changes behavior they asked for. Budget end is not approval, but a finding
+sides in 2-3 lines each in the report. Never stop to ask the user about a
+finding. When you are genuinely unsure, make your best call and mark the
+finding `unsure` in the report. Budget end is not approval, but a finding
 you declined with evidence does not block shipping.
 
 Do not push during the loop. Push after agreement only if the user asked
@@ -120,4 +121,5 @@ blurb:
 Add `on <effort>` only if verified.
 
 Report: rounds, model, what Sol changed, diff size before/after, fixed and
-declined findings with reasons, usage if exposed (else say not), pushed or not.
+declined findings with reasons, `unsure` findings, usage if exposed (else say
+not), pushed or not.

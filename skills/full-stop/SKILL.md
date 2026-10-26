@@ -43,5 +43,9 @@ without the user. If someone else merged it, report that instead.
   needed. Follow full-send's rules for asking the user.
 
 In T3 Code, call `unwatch_pull_request` before the handoff or a question.
+List every review finding you declined and every one you were unsure about,
+from Sol and from the PR's reviewers, each with a one line reason. The user
+reviews these before merging.
+
 Report the PR link, final head, verdict, proof, reviewer outcome, and remaining
 risks. State whether the PR is still open and unmerged.
