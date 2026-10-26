@@ -59,6 +59,9 @@ Changes from upstream:
 - `full-send` targets the base branch the user named, not only the default
   branch, and updates from it the way the repo does.
 - `sol-loop` also triggers on "local review".
+- The main agent decides which review findings to fix. `sol-loop` does not
+  hand disputes to the user, and `babysit-pr` resolves every bot thread it
+  handles, fixed or declined.
 
 Personal preferences live in `~/.codex/AGENTS.md`, not in these skills.
 
