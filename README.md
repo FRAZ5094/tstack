@@ -53,8 +53,9 @@ skills without losing them.
 FRAZ5094's copy, installed globally with `npx skills add FRAZ5094/tstack -g`.
 Changes from upstream:
 
-- `babysit-pr` and `pr-wait` treat the Codex review bot as a gating reviewer
-  and read its `codex-review-state` comment to tell when it finished.
+- `babysit-pr` and `pr-wait` wait for every review bot on the PR, found from
+  its activity rather than a fixed list. A bot is still reviewing while it has
+  a pending check, a 👀 reaction, or a running `codex-review-state`.
 - `full-send` targets the base branch the user named, not only the default
   branch, and updates from it the way the repo does.
 - `sol-loop` also triggers on "local review".

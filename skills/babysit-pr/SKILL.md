@@ -48,11 +48,11 @@ It prints one line per real event. It exits 0 when the `--until` condition is
 met or the PR merges, 1 when it needs you (a required check failed, conflicts,
 unresolved threads, PR closed), and 2 on bad input.
 
-- `ready` (default): required checks green, Greptile, Macroscope, or Codex
-  reviewed the head, none of them is still reviewing it, and no unresolved
-  threads. Use this to babysit.
-- `green`: required checks only. Use it when the repo has no Greptile,
-  Macroscope, or Codex.
+- `ready` (default): required checks green, no review bot is still reviewing
+  the head, at least one reviewed it (or none started within 5 minutes of the
+  push), and no unresolved threads. Any bot account counts as a review bot.
+  Use this to babysit.
+- `green`: required checks only.
 - `any-change`: exit on the first event.
 
 In Claude Code, run it with the Monitor tool (`timeout_ms: 3600000`), so each
@@ -87,13 +87,22 @@ reply to a Macroscope finding. Its findings cite them.
 CodeRabbit is advisory. Treat its findings like any other finding, but never
 wait for it and never hold a merge for it.
 
-Codex (`chatgpt-codex-connector`) is a gating reviewer. It keeps one summary
-comment and edits it, so its finish is not a new comment and
-`watch_pull_request` may not wake you for it. Read the `codex-review-state`
-JSON in that comment: Codex is done with the head when `code_review.commit_sha`
-is the head SHA and `status` is `completed`. `running` means wait. Its
-findings arrive as review threads. It reacts 👀 while it reviews and 👍 when it
-found nothing. Never call a PR ready while Codex is running on the head.
+Wait for every review bot on the PR, not a fixed list. A review bot is any bot
+account that reviewed, commented, opened a thread, or reacted on the PR, apart
+from CI and deploy bots. Bots report differently, and `watch_pull_request` may
+not wake you when a bot edits a comment or reacts. Before you call a PR ready,
+check each bot yourself:
+
+- **Still reviewing:** its own check is pending, it has a 👀 reaction on the
+  PR, or its status comment says it is running. Codex keeps
+  `codex-review-state` JSON in its summary comment. `running` for the head
+  means wait.
+- **Done:** it reviewed the head commit, its summary names the head, or its
+  checks finished.
+- **Not coming:** some bots only review the first commit. Do not wait for a
+  bot that has not started on the head 5 minutes after the push.
+
+Never call a PR ready while any review bot is still reviewing the head.
 
 If a review bot leaves feedback you believe is not worth addressing, reply with
 a written reason and resolve the comment. Use the `leaving-pr-comments` skill

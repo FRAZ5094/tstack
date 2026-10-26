@@ -11,9 +11,9 @@ Progress and errors that do not end the run go to stderr.
 --until
   green       required checks passed on the current head (every CI check when
               the base branch requires none)
-  ready      green, Greptile, Macroscope, or Codex reviewed the current head,
-              none of them is still reviewing it, and no review thread is
-              unresolved (default)
+  ready      green, no review bot is still reviewing the current head, at
+              least one reviewed it (or the head is 5 minutes old and none
+              started), and no review thread is unresolved (default)
   any-change  stop after the first poll that prints an event
 
 Exit codes
@@ -28,15 +28,18 @@ Events
   - all checks finished on the head (one summary line)
   - a new comment, review, thread, or thread reply from someone other than the
     PR author or the gh user
-  - Greptile, Macroscope, Codex, or CodeRabbit finished on the head, or a
-    Greptile or Macroscope summary changed after that
+  - a review bot finished on the head, or its summary changed after that
   - the base branch moved and the new commits touch files in this PR
   - merge state became BEHIND or DIRTY
   - the PR merged or closed
 
-CodeRabbit is advisory: pr-wait reports it but never waits for it. Codex
-edits one summary comment instead of posting a new one, so pr-wait reads the
-codex-review-state in that comment to tell when Codex finished the head. Comment
+Review bots are found from their activity on the PR, so any bot counts: a
+Bot account that reviewed, commented, opened a thread, or reacted. A bot is
+still reviewing while it has a pending check, a 👀 reaction on the PR, or a
+codex-review-state that is not completed for the head. It is done with the
+head once it reviewed that commit, its comment names the head, or its checks
+finished. A bot that reviewed an older head gets 5 minutes to start on the
+new one. CodeRabbit is advisory: pr-wait reports it but never waits for it. Comment
 edits are never events, and top-level comments from CI and deploy bots
 (github-actions, Vercel) are skipped, because checks already carry that news.
 
@@ -62,8 +65,12 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-GATING_BOTS = ("greptile", "macroscope", "codex")
+# Review bots are found from their activity on the PR. These names only tie a
+# bot to its own check runs, which carry a product name instead of a login.
+KNOWN_BOTS = ("greptile", "macroscope", "codex", "coderabbit")
 ADVISORY_BOTS = ("coderabbit",)
+# How long a bot that reviewed an earlier head has to start on a new one.
+BOT_GRACE_SECONDS = 300
 # CI and deploy bots report through checks. Their PR comments are status reports.
 STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare")
 STATE_DIR = Path.home() / ".local" / "state" / "pr-wait"
@@ -92,6 +99,10 @@ query($owner: String!, $name: String!, $number: Int!) {
       author { login }
       baseRef { target { oid } }
       comments(last: 100) { nodes { id url body author { login __typename } } }
+      reactionGroups {
+        content
+        reactors(first: 20) { nodes { __typename ... on Bot { login } ... on User { login } } }
+      }
       reviews(last: 100) {
         nodes { id url state body commit { oid } author { login __typename } }
       }
@@ -150,7 +161,7 @@ def gh_lines(args: list[str]) -> list[str]:
 def bot_name(text: str | None) -> str | None:
     """Which review bot a login or check name belongs to, if any."""
     lowered = (text or "").lower()
-    return next((bot for bot in GATING_BOTS + ADVISORY_BOTS if bot in lowered), None)
+    return next((bot for bot in KNOWN_BOTS if bot in lowered), None)
 
 
 def who(node: Json) -> tuple[str, bool]:
@@ -428,57 +439,91 @@ class Watcher:
                 kind = "new thread" if index == 0 else "thread reply"
                 self.emit(f"c:{comment['id']}", f"{kind} from {login} on {where}: {snippet(comment['body'])} {comment['url']}")
 
-        # Review bots on the current head. A bot with checks is done when they
-        # finish. Otherwise it is done once it reviews the head commit or its
-        # summary names the head.
+        # Review bots, found from their activity so any bot counts. A bot with
+        # checks is done when they finish. Otherwise it is reviewing while it
+        # shows 👀 or a running state, and done once it reviewed the head commit
+        # or its comment names the head.
+        now = time.time()
+        head_seen = self.state.get("head_seen") or {}
+        self.state["head_seen"] = {head: head_seen.get(head, now)}
+        settled = now - self.state["head_seen"][head] >= BOT_GRACE_SECONDS
+
+        def review_bot(login: str, is_bot: bool) -> str | None:
+            if not is_bot or login in mine or any(b in login for b in STATUS_BOTS):
+                return None
+            return bot_name(login) or login.removesuffix("[bot]")
+
+        bots: dict[str, Json] = {}
+
+        def track(login: str, is_bot: bool) -> Json | None:
+            key = review_bot(login, is_bot)
+            return bots.setdefault(key, {"comments": [], "reviews": [], "eyes": False}) if key else None
+
+        for comment in comments:
+            if (entry := track(*who(comment))) is not None:
+                entry["comments"].append(comment)
+        for review in reviews:
+            if (entry := track(*who(review))) is not None:
+                entry["reviews"].append(review)
+        for thread in threads:
+            for comment in thread["comments"]["nodes"]:
+                track(*who(comment))
+        for group in pr.get("reactionGroups") or []:
+            for node in group["reactors"]["nodes"]:
+                entry = track(node.get("login") or "ghost", node.get("__typename") == "Bot")
+                if entry is not None and group["content"] == "EYES":
+                    entry["eyes"] = True
+        for name in checks:
+            if bot_name(name):
+                bots.setdefault(bot_name(name), {"comments": [], "reviews": [], "eyes": False})
+
         bot_status: dict[str, str] = {}
         reviewed: list[str] = []
-        running: list[str] = []
-        for bot in GATING_BOTS + ADVISORY_BOTS:
+        waiting: list[str] = []
+        for bot in sorted(bots):
+            entry = bots[bot]
             own_checks = {name: c for name, c in checks.items() if bot_name(name) == bot}
-            summaries = [c for c in comments if bot_name(who(c)[0]) == bot]
-            own_reviews = [r for r in reviews if bot_name(who(r)[0]) == bot]
-            on_head = any((r.get("commit") or {}).get("oid") == head for r in own_reviews)
-            codex_head = None
+            summaries = entry["comments"]
+            on_head = any((r.get("commit") or {}).get("oid") == head for r in entry["reviews"])
+            states = (codex_state(c["body"]) or {} for c in summaries)
+            state = next((st for st in states if st.get("commit_sha") == head), None)
             if own_checks:
                 done = all(c["bucket"] != "pending" for c in own_checks.values())
-                if not done and bot in GATING_BOTS:
-                    running.append(bot)
-            elif bot == "codex":
-                states = (codex_state(s["body"]) or {} for s in summaries)
-                codex_head = next((s for s in states if s.get("commit_sha") == head), None)
-                done = on_head or (codex_head or {}).get("status") == "completed"
-                if codex_head and not done:
-                    running.append(bot)
+                running = not done
             else:
-                done = on_head or any(short in s["body"] for s in summaries)
-            seen = bool(own_checks or summaries or own_reviews)
-            if bot in ADVISORY_BOTS and own_checks:
+                running = entry["eyes"] or bool(state and state.get("status") != "completed")
+                done = not running and (on_head or bool(state) or any(short in c["body"] for c in summaries))
+            advisory = bot in ADVISORY_BOTS
+            if advisory and own_checks:
                 desc = next(iter(own_checks.values()))
                 bot_status[bot] = f"{bot} {desc['description'] or desc['bucket']} (advisory)"
-            elif seen:
-                bot_status[bot] = f"{bot} {'done' if done else 'pending'}{' (advisory)' if bot in ADVISORY_BOTS else ''}"
+            else:
+                word = "done" if done else "reviewing" if running else "not on head"
+                bot_status[bot] = f"{bot} {word}{' (advisory)' if advisory else ''}"
+            if not advisory:
+                if done:
+                    reviewed.append(bot)
+                elif running or not settled:
+                    waiting.append(bot)
             key = f"bot:{bot}:{head}"
             was_done = key in self.reported
             if done:
-                if bot in GATING_BOTS:
-                    reviewed.append(bot)
                 failed = [name for name, c in own_checks.items() if c["bucket"] in FAILED]
                 detail = "; ".join(filter(None, [
-                    next((v for v in map(verdict, (s["body"] for s in summaries)) if v), ""),
-                    ("unresolved findings" if codex_head.get("has_unresolved_findings") else "no findings")
-                    if codex_head else "",
+                    next((v for v in map(verdict, (c["body"] for c in summaries)) if v), ""),
+                    ("unresolved findings" if state.get("has_unresolved_findings") else "no findings")
+                    if state else "",
                     f"failed: {', '.join(failed)}" if failed else "",
                 ]))
-                tag = " (advisory, not waited on)" if bot in ADVISORY_BOTS else ""
+                tag = " (advisory, not waited on)" if advisory else ""
                 self.emit(key, f"{bot} finished on {short}{': ' + detail if detail else ''}{tag}")
-            if bot in GATING_BOTS:
-                for s in summaries:
-                    new, old = digest(s["body"]), self.state["summaries"].get(s["id"])
-                    self.state["summaries"][s["id"]] = new
+            if not advisory:
+                for c in summaries:
+                    new, old = digest(c["body"]), self.state["summaries"].get(c["id"])
+                    self.state["summaries"][c["id"]] = new
                     if was_done and old and old != new:
-                        text = verdict(s["body"]) or snippet(s["body"])
-                        self.emit(f"summary:{s['id']}:{new}", f"{bot} summary changed on {short}: {text} {s['url']}")
+                        text = verdict(c["body"]) or snippet(c["body"])
+                        self.emit(f"summary:{c['id']}:{new}", f"{bot} summary changed on {short}: {text} {c['url']}")
 
         # Base branch and merge state.
         base_oid = ((pr.get("baseRef") or {}).get("target") or {}).get("oid")
@@ -513,8 +558,7 @@ class Watcher:
             f"required {sum(bucket(n) in ('pass', 'skipping') for n in self.required)}/{len(self.required)} green"
             if self.required
             else "",
-            ", ".join(bot_status[b] for b in GATING_BOTS + ADVISORY_BOTS if b in bot_status)
-            or "no review bot yet",
+            ", ".join(bot_status.values()) or "no review bot yet",
             f"{len(unresolved)} unresolved threads",
             f"merge state {merge_state}",
         ]
@@ -531,10 +575,9 @@ class Watcher:
             if green and self.until == "green":
                 self.reported.add(checks_key)
                 self.finish(0, [f"green on {short}: {summary}{self.behind(base, base_oid, head)}"])
-            # ready waits for Greptile, Macroscope, or Codex, never for CodeRabbit.
-            # Codex marks its state running on the head, so a review in progress
-            # holds ready even when another bot already finished.
-            if green and reviewed and not running:
+            # ready waits for every review bot except advisory ones. A bot that
+            # has not started on the head yet gets BOT_GRACE_SECONDS to start.
+            if green and not waiting and (reviewed or settled):
                 if unresolved:
                     self.finish(1, [f"blocked by {len(unresolved)} unresolved threads on {short}: {' '.join(unresolved)}"])
                 if merge_state == "BEHIND":
