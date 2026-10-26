@@ -107,9 +107,10 @@ Mark each old id `resolved` or `still open: <reason>`.
 Agreed: APPROVE on the current behavior diff, no blocker or should open,
 no concern of your own. Stuck: an item stays disputed after two replies,
 or budget ends. Make the call yourself: fix it or decline it, and show both
-sides in 2-3 lines each in the report. Never stop to ask the user about a
-finding. When you are genuinely unsure, make your best call and mark the
-finding `unsure` in the report. Budget end is not approval, but a finding
+sides in 2-3 lines each in the report. Do not stop to ask the user about a
+finding, unless it shows something seriously wrong that should not ship,
+such as a security hole, data loss, or a production breakage. When you are genuinely unsure, make your
+best call and mark the finding `unsure` in the report. Budget end is not approval, but a finding
 you declined with evidence does not block shipping.
 
 Do not push during the loop. Push after agreement only if the user asked
