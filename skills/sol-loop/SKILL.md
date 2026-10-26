@@ -80,7 +80,9 @@ S1 [blocker|should|nit] <file>:<line> <claim>. Fix: <suggestion> (stable ids)
 ## 3. Answer findings
 
 Check each finding and severity yourself. Another path, rare case, or
-small cost is a nit, whatever label it came with.
+small cost is a nit, whatever label it came with. You decide what gets
+fixed. Declining a finding that is wrong, overengineered, or not worth its
+cost needs no approval from Sol or the user.
 
 - Agree: smallest fix. Prefer delete or narrow over new lock, cache,
   helper, or option. Fix the case that happened. Add one focused test
@@ -104,14 +106,16 @@ Mark each old id `resolved` or `still open: <reason>`.
 
 Agreed: APPROVE on the current behavior diff, no blocker or should open,
 no concern of your own. Stuck: an item stays disputed after two replies,
-or budget ends. Show both sides in 2-3 lines each. The user decides.
-Budget end is not approval.
+or budget ends. Make the call yourself: fix it or decline it, and show both
+sides in 2-3 lines each in the report. Ask the user only when the choice
+changes behavior they asked for. Budget end is not approval, but a finding
+you declined with evidence does not block shipping.
 
 Do not push during the loop. Push after agreement only if the user asked
 to push, ship, or update the PR. If you push to a PR, add above the model
 blurb:
 
-`Reviewed with sol-loop: <N> rounds with <model>. Sol verdict: approved`.
+`Reviewed with sol-loop: <N> rounds with <model>. Sol verdict: <approved, or N findings declined>`.
 
 Add `on <effort>` only if verified.
 

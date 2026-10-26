@@ -104,9 +104,18 @@ check each bot yourself:
 
 Never call a PR ready while any review bot is still reviewing the head.
 
-If a review bot leaves feedback you believe is not worth addressing, reply with
-a written reason and resolve the comment. Use the `leaving-pr-comments` skill
-for every comment posted on the user's behalf.
+You decide which findings are worth fixing. Declining one that is wrong, out
+of scope, overengineered, or not worth its cost needs no approval from the
+user. Resolve every review bot thread you handle:
+
+- **Fixed:** after the push, reply with what changed and the commit, then
+  resolve the thread.
+- **Declined:** reply with the reason in a line or two, then resolve the
+  thread as is.
+
+Threads from the user follow the same rule. Reply to threads from other people,
+but leave them open for that person unless the user says otherwise. Use the
+`leaving-pr-comments` skill for every comment posted on the user's behalf.
 
 Screenshots and videos help as well, when you have a way to upload them.
 
