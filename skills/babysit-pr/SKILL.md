@@ -114,7 +114,8 @@ user. Resolve every review bot thread you handle:
   thread as is.
 
 Do not stop to ask the user about a finding, unless it shows something
-seriously wrong that should not ship, such as a security hole, data loss, or a production breakage.
+seriously wrong that should not ship, such as a security hole, data loss, or
+a production breakage.
 When you are genuinely unsure, make your best call and note it for the final
 report. End with the fixed, declined, and unsure findings, each with a one
 line reason.
