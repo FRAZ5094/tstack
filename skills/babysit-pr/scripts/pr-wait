@@ -11,8 +11,9 @@ Progress and errors that do not end the run go to stderr.
 --until
   green       required checks passed on the current head (every CI check when
               the base branch requires none)
-  ready      green, Greptile or Macroscope reviewed the current head, and no
-              review thread is unresolved (default)
+  ready      green, Greptile, Macroscope, or Codex reviewed the current head,
+              none of them is still reviewing it, and no review thread is
+              unresolved (default)
   any-change  stop after the first poll that prints an event
 
 Exit codes
@@ -27,13 +28,15 @@ Events
   - all checks finished on the head (one summary line)
   - a new comment, review, thread, or thread reply from someone other than the
     PR author or the gh user
-  - Greptile, Macroscope, or CodeRabbit finished on the head, or a Greptile or
-    Macroscope summary changed after that
+  - Greptile, Macroscope, Codex, or CodeRabbit finished on the head, or a
+    Greptile or Macroscope summary changed after that
   - the base branch moved and the new commits touch files in this PR
   - merge state became BEHIND or DIRTY
   - the PR merged or closed
 
-CodeRabbit is advisory: pr-wait reports it but never waits for it. Comment
+CodeRabbit is advisory: pr-wait reports it but never waits for it. Codex
+edits one summary comment instead of posting a new one, so pr-wait reads the
+codex-review-state in that comment to tell when Codex finished the head. Comment
 edits are never events, and top-level comments from CI and deploy bots
 (github-actions, Vercel) are skipped, because checks already carry that news.
 
@@ -59,7 +62,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-GATING_BOTS = ("greptile", "macroscope")
+GATING_BOTS = ("greptile", "macroscope", "codex")
 ADVISORY_BOTS = ("coderabbit",)
 # CI and deploy bots report through checks. Their PR comments are status reports.
 STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare")
@@ -73,6 +76,8 @@ TRANSIENT = re.compile(
     r"temporar|could not resolve host|TLS handshake|Something went wrong",
     re.IGNORECASE,
 )
+# Codex keeps its review state as JSON in an HTML comment of its summary.
+CODEX_STATE = re.compile(r"codex-review-state:v1\s+(\{.*?\})\s*-->", re.DOTALL)
 FAILED = ("fail", "cancel")
 # gh pr checks buckets, worst first. Duplicate names (push and pull_request runs
 # of one job) collapse to the worst bucket.
@@ -169,6 +174,17 @@ def verdict(body: str) -> str:
         if re.search(r"verdict|confidence score", line, re.IGNORECASE):
             return snippet(line.replace("*", ""), 80)
     return ""
+
+
+def codex_state(body: str) -> Json | None:
+    """The code review state from a Codex summary comment, if it has one."""
+    match = CODEX_STATE.search(body or "")
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1)).get("code_review") or {}
+    except ValueError:
+        return None
 
 
 def digest(body: str) -> str:
@@ -417,13 +433,23 @@ class Watcher:
         # summary names the head.
         bot_status: dict[str, str] = {}
         reviewed: list[str] = []
+        running: list[str] = []
         for bot in GATING_BOTS + ADVISORY_BOTS:
             own_checks = {name: c for name, c in checks.items() if bot_name(name) == bot}
             summaries = [c for c in comments if bot_name(who(c)[0]) == bot]
             own_reviews = [r for r in reviews if bot_name(who(r)[0]) == bot]
             on_head = any((r.get("commit") or {}).get("oid") == head for r in own_reviews)
+            codex_head = None
             if own_checks:
                 done = all(c["bucket"] != "pending" for c in own_checks.values())
+                if not done and bot in GATING_BOTS:
+                    running.append(bot)
+            elif bot == "codex":
+                states = (codex_state(s["body"]) or {} for s in summaries)
+                codex_head = next((s for s in states if s.get("commit_sha") == head), None)
+                done = on_head or (codex_head or {}).get("status") == "completed"
+                if codex_head and not done:
+                    running.append(bot)
             else:
                 done = on_head or any(short in s["body"] for s in summaries)
             seen = bool(own_checks or summaries or own_reviews)
@@ -440,6 +466,8 @@ class Watcher:
                 failed = [name for name, c in own_checks.items() if c["bucket"] in FAILED]
                 detail = "; ".join(filter(None, [
                     next((v for v in map(verdict, (s["body"] for s in summaries)) if v), ""),
+                    ("unresolved findings" if codex_head.get("has_unresolved_findings") else "no findings")
+                    if codex_head else "",
                     f"failed: {', '.join(failed)}" if failed else "",
                 ]))
                 tag = " (advisory, not waited on)" if bot in ADVISORY_BOTS else ""
@@ -486,7 +514,7 @@ class Watcher:
             if self.required
             else "",
             ", ".join(bot_status[b] for b in GATING_BOTS + ADVISORY_BOTS if b in bot_status)
-            or "no Greptile or Macroscope yet",
+            or "no review bot yet",
             f"{len(unresolved)} unresolved threads",
             f"merge state {merge_state}",
         ]
@@ -503,8 +531,10 @@ class Watcher:
             if green and self.until == "green":
                 self.reported.add(checks_key)
                 self.finish(0, [f"green on {short}: {summary}{self.behind(base, base_oid, head)}"])
-            # ready waits for Greptile or Macroscope, never for CodeRabbit.
-            if green and reviewed:
+            # ready waits for Greptile, Macroscope, or Codex, never for CodeRabbit.
+            # Codex marks its state running on the head, so a review in progress
+            # holds ready even when another bot already finished.
+            if green and reviewed and not running:
                 if unresolved:
                     self.finish(1, [f"blocked by {len(unresolved)} unresolved threads on {short}: {' '.join(unresolved)}"])
                 if merge_state == "BEHIND":

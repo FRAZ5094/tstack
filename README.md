@@ -48,6 +48,19 @@ These are starting points. Edit them. Put personal settings, like which models
 sit on your council, in your `CLAUDE.md` or `AGENTS.md`, so you can update the
 skills without losing them.
 
+## This fork
+
+FRAZ5094's copy, installed globally with `npx skills add FRAZ5094/tstack -g`.
+Changes from upstream:
+
+- `babysit-pr` and `pr-wait` treat the Codex review bot as a gating reviewer
+  and read its `codex-review-state` comment to tell when it finished.
+- `full-send` targets the base branch the user named, not only the default
+  branch, and updates from it the way the repo does.
+- `sol-loop` also triggers on "local review".
+
+Personal preferences live in `~/.codex/AGENTS.md`, not in these skills.
+
 ## License
 
 [MIT](LICENSE)

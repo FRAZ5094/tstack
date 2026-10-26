@@ -1,6 +1,6 @@
 ---
 name: sol-loop
-description: Use when the user says "sol loop".
+description: Use when the user says "sol loop", or asks for a local review, a review from Sol, or a review from GPT.
 ---
 
 # sol-loop

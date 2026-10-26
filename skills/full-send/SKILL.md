@@ -47,9 +47,11 @@ one appears.
    that could. If you are on the default branch, create a branch first.
 2. **Prove it.** Get proof for every change you made. See "Proof".
 3. **Get feedback.** Use the `sol-loop` skill to verify changes.
-4. **File the PR** with the `file-pr` skill. Rebase onto the latest default
-   branch first. Add one short line to the description that says how you proved
-   the change.
+4. **File the PR** with the `file-pr` skill. Target the base branch the user
+   named, or the default branch if they named none. Bring the branch up to
+   date with that base first, the way the repo does it: rebase, or merge the
+   base in when the repo uses merge commits. Add one short line to the
+   description that says how you proved the change.
 5. **Babysit the PR** with the `babysit-pr` skill. Fix real findings and CI
    failures. Get proof for each fix before you push it.
 6. **Merge** when the merge gate passes.
@@ -88,7 +90,7 @@ Full confidence means all of these are true on the latest commit:
 - Review bots have finished, and each finding is fixed or dismissed with a
   written reason.
 - No human review still requests changes.
-- The branch is up to date with the default branch, and GitHub reports it as
+- The branch is up to date with its base branch, and GitHub reports it as
   mergeable.
 
 Merge with the method the repo uses. Check the allowed methods and recent merged
